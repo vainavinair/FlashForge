@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.pdf_handler import load_pdf, extract_text_all_pages
+from utils.pdf_handler import load_pdf, extract_text_or_ocr
 from utils.text_handler import load_txt, load_docx
 
 st.title("Universal File Uploader 📄")
@@ -22,9 +22,12 @@ if uploaded_file is not None:
             if num_pages > 20:
                 st.error("PDF has more than 20 pages. Please upload a shorter PDF.")
             else:
-                full_text = extract_text_all_pages(pdf)
-                st.subheader("Extracted Text:")
-                st.text(full_text)
+                full_text = extract_text_or_ocr(pdf)
+                if full_text.strip():
+                    st.subheader("Extracted Text:")
+                    st.text(full_text)
+                else:
+                    st.error("No text could be extracted from this PDF, even after OCR.")
 
     elif filename.endswith(".txt"):
         text = load_txt(uploaded_file)
