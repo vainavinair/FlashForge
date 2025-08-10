@@ -2,6 +2,12 @@
 
 import pytesseract
 from PIL import Image
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+TESS_PATH = os.getenv("TESS_PATH")
+pytesseract.pytesseract.tesseract_cmd = TESS_PATH
 
 def ocr_image(image: Image.Image) -> str:
     """

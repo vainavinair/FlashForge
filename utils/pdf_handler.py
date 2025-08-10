@@ -16,7 +16,7 @@ def extract_text_all_pages(pdf):
             all_text += text + "\n"
     return all_text.strip()
 
-def extract_text_or_ocr(pdf, threshold=50):
+def extract_text_or_ocr(pdf, threshold=1000):
     """
     Extract text from PDF pages.
     If extracted text length < threshold, use OCR on PDF pages.
