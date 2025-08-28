@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.db import get_connection
+from utils.datamodels.db import get_connection
 
 def register_user(username, password):
     conn = get_connection()
@@ -24,5 +24,4 @@ def login_user(username, password):
 def logout():
     if "user_id" in st.session_state:
         del st.session_state["user_id"]
-
 

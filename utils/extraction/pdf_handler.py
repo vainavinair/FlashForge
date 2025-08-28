@@ -1,7 +1,16 @@
 import pdfplumber
-from utils.ocr_handler import ocr_pdf_pages
+from utils.extraction.ocr_handler import ocr_pdf_pages
 
 def load_pdf(uploaded_file):
+    """
+    Load a PDF file using pdfplumber.
+    
+    Args:
+        uploaded_file: Can be a file path string or a file-like object
+        
+    Returns:
+        PDF object or None if loading fails
+    """
     try:
         return pdfplumber.open(uploaded_file)
     except Exception as e:
