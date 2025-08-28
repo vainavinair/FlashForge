@@ -27,8 +27,7 @@ class HybridScheduler:
                 base_learning_rate=row[1],
                 base_forgetting_rate=row[2],
                 exploration_weight=row[3],
-                knowledge_weight=row[4],
-                optimal_session_length=row[5]
+                knowledge_weight=row[4]
             )
         else:
             params = UserLearningParams(user_id=user_id)

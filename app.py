@@ -100,7 +100,7 @@ def load_dashboard_data(user_id: int):
         """
     else:
         due_clause = """
-            , NULL as due_today
+            , SUM(CASE WHEN c.last_reviewed IS NULL OR c.last_reviewed < datetime('now', '-1 day') THEN 1 ELSE 0 END) as due_today
             FROM decks d
             LEFT JOIN cards c ON c.deck_id = d.deck_id
         """
@@ -195,6 +195,17 @@ if "user_id" not in st.session_state:
 # =====================================================
 else:
     user_id = st.session_state.user_id
+    
+    # Initialize session state variables for review functionality
+    if "review_cards" not in st.session_state:
+        st.session_state.review_cards = None
+    if "review_idx" not in st.session_state:
+        st.session_state.review_idx = 0
+    if "current_card_id" not in st.session_state:
+        st.session_state.current_card_id = None
+    if "card_start_time" not in st.session_state:
+        st.session_state.card_start_time = None
+    
     with st.sidebar:
         st.success(f"Logged in as user_id={user_id}")
         if st.button("Logout"):
@@ -207,6 +218,15 @@ else:
             if new_deck_name.strip():
                 create_deck(user_id, new_deck_name.strip())
                 st.rerun()
+
+    # Add a section to display and update user-specific learning parameters
+    with st.sidebar:
+        st.subheader("Learning Parameters")
+        user_params = _hybrid.get_user_params(user_id)
+        st.write(f"Learning Rate: {user_params.base_learning_rate:.2f}")
+        st.write(f"Forgetting Rate: {user_params.base_forgetting_rate:.2f}")
+        st.write(f"Exploration Weight: {user_params.exploration_weight:.2f}")
+        st.write(f"Knowledge Weight: {user_params.knowledge_weight:.2f}")
 
     # Top-level tabs
     tab_dash, tab_decks, tab_upload, tab_review = st.tabs(["📊 Dashboard", "🗂️ Decks", "📄 Upload & Generate", "🧠 Review"])
@@ -250,7 +270,7 @@ else:
             deck_df = data["deck_df"]
             if len(deck_df):
                 show_df = deck_df.copy()
-                show_df["avg_knowledge"] = (show_df["avg_knowledge"].fillna(0) * 100).round(1)
+                show_df["avg_knowledge"] = (show_df["avg_knowledge"].fillna(0).infer_objects(copy=False) * 100).round(1)
                 st.dataframe(
                     show_df.rename(columns={
                         "deck_name":"Deck",
@@ -346,8 +366,8 @@ else:
             if filename.endswith(".pdf"):
                 pdf = load_pdf(uploaded_file)
                 if pdf:
-                    if len(pdf.pages) > 20:
-                        st.error("PDF has more than 20 pages ❌")
+                    if len(pdf.pages) > 40:
+                        st.error("PDF has more than 40 pages ❌")
                     else:
                         with st.spinner("Extracting from PDF (OCR if needed)…"):
                             full_text = extract_text_or_ocr(pdf)
@@ -382,71 +402,216 @@ else:
     # ======================= REVIEW =======================
     with tab_review:
         st.subheader("Review / Study Mode")
-        # Choose deck to review
+        
+        # Step 1: Deck Selection
+        st.markdown("### Step 1: Select Decks")
         decks_rv = list_decks(user_id)
-        deck_names_rv = {deck_id: name for deck_id, name in decks_rv}
-        if decks_rv:
-            selected_deck_id_rv = st.selectbox(
-                "Select a deck to review:",
-                options=list(deck_names_rv.keys()),
-                format_func=lambda x: deck_names_rv[x],
-                key="deck_select_review"
-            )
-        else:
-            selected_deck_id_rv = None
+        if not decks_rv:
             st.info("Create a deck first to start reviewing.")
-
-        session_size = st.number_input("Cards per session", min_value=1, max_value=100, value=10, step=1)
-        if st.button("Start Review Session"):
-            if selected_deck_id_rv:
-                due_card_ids = get_due_cards(user_id, selected_deck_id_rv, limit=session_size)
-                if not due_card_ids:
-                    st.info("No cards due for review.")
+        else:
+            deck_names_rv = {deck_id: name for deck_id, name in decks_rv}
+            
+            # Option to select multiple decks
+            use_multiple_decks = st.checkbox("Review multiple decks", key="multi_deck_review")
+            
+            if use_multiple_decks:
+                selected_deck_ids = st.multiselect(
+                    "Select decks to review:",
+                    options=list(deck_names_rv.keys()),
+                    format_func=lambda x: deck_names_rv[x],
+                    key="deck_select_review_multi"
+                )
+            else:
+                selected_deck_id = st.selectbox(
+                    "Select a deck to review:",
+                    options=list(deck_names_rv.keys()),
+                    format_func=lambda x: deck_names_rv[x],
+                    key="deck_select_review_single"
+                )
+                selected_deck_ids = [selected_deck_id] if selected_deck_id else []
+            
+            # Step 2: Start Review Session
+            if selected_deck_ids:
+                if st.button("Start Review Session", key="start_review_session"):
+                    # Get due cards from selected decks (default to 10 cards)
+                    all_due_cards = []
+                    for deck_id in selected_deck_ids:
+                        due_cards = get_due_cards(user_id, deck_id, limit=10)
+                        all_due_cards.extend(due_cards)
+                    
+                    # Limit to 10 cards
+                    all_due_cards = all_due_cards[:10]
+                    
+                    if all_due_cards:
+                        st.session_state.review_cards = all_due_cards
+                        st.session_state.review_idx = 0
+                        st.session_state.current_card_id = all_due_cards[0]
+                        st.rerun()
+                    else:
+                        st.info("No cards due for review in the selected deck(s).")
+            
+            # Step 3: Review Interface
+            if "review_cards" in st.session_state and st.session_state.get("review_cards"):
+                review_cards = st.session_state["review_cards"]
+                current_idx = st.session_state.get("review_idx", 0)
+                
+                if current_idx < len(review_cards):
+                    card_id = review_cards[current_idx]
+                    
+                    # Track when this card was first shown - reset for each new card
+                    if st.session_state.current_card_id != card_id:
+                        st.session_state.card_start_time = datetime.now()
+                        st.session_state.current_card_id = card_id
+                    
+                    # Get card details
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    cur.execute("SELECT question, answer FROM cards WHERE card_id = ?", (card_id,))
+                    card_data = cur.fetchone()
+                    conn.close()
+                    
+                    if card_data:
+                        question, answer = card_data
+                        
+                        st.markdown("---")
+                        st.markdown(f"### Card {current_idx + 1} of {len(review_cards)}")
+                        
+                        # Display question
+                        st.markdown(f"**Question:**")
+                        st.write(question)
+                        
+                        # Show answer button
+                        show_answer = st.checkbox("Show Answer", key=f"show_answer_{card_id}")
+                        
+                        if show_answer:
+                            st.markdown(f"**Answer:**")
+                            st.write(answer)
+                        
+                        # Review buttons
+                        st.markdown("### How well did you know this?")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            if st.button("❌ Failed", key=f"failed_{card_id}", type="primary"):
+                                # Calculate response time
+                                current_time = datetime.now()
+                                if st.session_state.card_start_time and isinstance(st.session_state.card_start_time, datetime):
+                                    response_time = (current_time - st.session_state.card_start_time).total_seconds()
+                                else:
+                                    response_time = 1.0  # Default to 1 second if timing failed
+                                
+                                record_review(card_id, user_id, grade=0, response_time=response_time)
+                                
+                                # Move to next card
+                                st.session_state.review_idx += 1
+                                if st.session_state.review_idx < len(review_cards):
+                                    next_card_id = review_cards[st.session_state.review_idx]
+                                    st.session_state.current_card_id = next_card_id
+                                    st.session_state.card_start_time = datetime.now()  # Reset for next card
+                                else:
+                                    # End of session
+                                    st.session_state.current_card_id = None
+                                    st.session_state.card_start_time = None
+                                st.rerun()
+                        
+                        with col2:
+                            if st.button("😰 Hard", key=f"hard_{card_id}"):
+                                # Calculate response time
+                                current_time = datetime.now()
+                                if st.session_state.card_start_time and isinstance(st.session_state.card_start_time, datetime):
+                                    response_time = (current_time - st.session_state.card_start_time).total_seconds()
+                                else:
+                                    response_time = 1.0  # Default to 1 second if timing failed
+                                
+                                record_review(card_id, user_id, grade=1, response_time=response_time)
+                                
+                                # Move to next card
+                                st.session_state.review_idx += 1
+                                if st.session_state.review_idx < len(review_cards):
+                                    next_card_id = review_cards[st.session_state.review_idx]
+                                    st.session_state.current_card_id = next_card_id
+                                    st.session_state.card_start_time = datetime.now()  # Reset for next card
+                                else:
+                                    # End of session
+                                    st.session_state.current_card_id = None
+                                    st.session_state.card_start_time = None
+                                st.rerun()
+                        
+                        with col3:
+                            if st.button("😊 Good", key=f"good_{card_id}"):
+                                # Calculate response time
+                                current_time = datetime.now()
+                                if st.session_state.card_start_time and isinstance(st.session_state.card_start_time, datetime):
+                                    response_time = (current_time - st.session_state.card_start_time).total_seconds()
+                                else:
+                                    response_time = 1.0  # Default to 1 second if timing failed
+                                
+                                record_review(card_id, user_id, grade=2, response_time=response_time)
+                                
+                                # Move to next card
+                                st.session_state.review_idx += 1
+                                if st.session_state.review_idx < len(review_cards):
+                                    next_card_id = review_cards[st.session_state.review_idx]
+                                    st.session_state.current_card_id = next_card_id
+                                    st.session_state.card_start_time = datetime.now()  # Reset for next card
+                                else:
+                                    # End of session
+                                    st.session_state.current_card_id = None
+                                    st.session_state.card_start_time = None
+                                st.rerun()
+                        
+                        with col4:
+                            if st.button("🎉 Easy", key=f"easy_{card_id}"):
+                                # Calculate response time
+                                current_time = datetime.now()
+                                if st.session_state.card_start_time and isinstance(st.session_state.card_start_time, datetime):
+                                    response_time = (current_time - st.session_state.card_start_time).total_seconds()
+                                else:
+                                    response_time = 1.0  # Default to 1 second if timing failed
+                                
+                                record_review(card_id, user_id, grade=3, response_time=response_time)
+                                
+                                # Move to next card
+                                st.session_state.review_idx += 1
+                                if st.session_state.review_idx < len(review_cards):
+                                    next_card_id = review_cards[st.session_state.review_idx]
+                                    st.session_state.current_card_id = next_card_id
+                                    st.session_state.card_start_time = datetime.now()  # Reset for next card
+                                else:
+                                    # End of session
+                                    st.session_state.current_card_id = None
+                                    st.session_state.card_start_time = None
+                                st.rerun()
+                        
+                        # Session progress
+                        progress = (current_idx + 1) / len(review_cards)
+                        st.progress(progress)
+                        st.write(f"Progress: {current_idx + 1}/{len(review_cards)} cards reviewed")
+                        
+                        # Option to end session early
+                        if st.button("End Session Early", key="end_session_early"):
+                            st.session_state.pop("review_cards", None)
+                            st.session_state.pop("review_idx", None)
+                            st.session_state.pop("current_card_id", None)
+                            st.session_state.pop("card_start_time", None)
+                            st.success("Session ended early. Great job!")
+                            st.rerun()
+                
                 else:
-                    st.session_state.review_cards = due_card_ids
-                    st.session_state.review_idx = 0
-                    st.rerun()
-            else:
-                st.warning("Pick a deck to review.")
-
-        # Review flow
-        if "review_cards" in st.session_state and st.session_state.get("review_cards"):
-            idx = st.session_state.get("review_idx", 0)
-            review_ids = st.session_state["review_cards"]
-            if idx < len(review_ids):
-                card_id = review_ids[idx]
-                conn = get_connection()
-                cur = conn.cursor()
-                cur.execute("SELECT question, answer FROM cards WHERE card_id = ?", (card_id,))
-                r = cur.fetchone()
-                conn.close()
-
-                if r:
-                    question, answer = r[0], r[1]
-                    st.markdown(f"### Card {idx+1} / {len(review_ids)}")
-                    st.markdown(f"**Q:** {question}")
-                    show_ans = st.checkbox("Show Answer", key=f"show_ans_{card_id}")
-                    if show_ans:
-                        st.markdown(f"**A:** {answer}")
-
-                    col1, col2, col3, col4 = st.columns(4)
-                    if col1.button("Again"):
-                        record_review(card_id, user_id, grade=0, response_time=None)
-                        st.session_state.review_idx += 1
+                    # Session complete
+                    st.success("🎉 Review session complete! Great job!")
+                    st.balloons()
+                    
+                    # Clear session state
+                    st.session_state.pop("review_cards", None)
+                    st.session_state.pop("review_idx", None)
+                    st.session_state.pop("current_card_id", None)
+                    st.session_state.pop("card_start_time", None)
+                    
+                    # Show session summary
+                    st.markdown("### Session Summary")
+                    st.write(f"✅ Completed {len(review_cards)} card reviews")
+                    
+                    if st.button("Start Another Session", key="start_another_session"):
                         st.rerun()
-                    if col2.button("Hard"):
-                        record_review(card_id, user_id, grade=1, response_time=None)
-                        st.session_state.review_idx += 1
-                        st.rerun()
-                    if col3.button("Good"):
-                        record_review(card_id, user_id, grade=2, response_time=None)
-                        st.session_state.review_idx += 1
-                        st.rerun()
-                    if col4.button("Easy"):
-                        record_review(card_id, user_id, grade=3, response_time=None)
-                        st.session_state.review_idx += 1
-                        st.rerun()
-            else:
-                st.success("Session complete ✅")
-                st.session_state.pop("review_cards", None)
-                st.session_state.pop("review_idx", None)

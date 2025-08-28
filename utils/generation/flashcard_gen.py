@@ -30,6 +30,7 @@ Rules:
 - Skip unclear or irrelevant parts of the text.
 - Do not include explanations, examples, or commentary.
 - Output only the flashcards, one per line, no extra formatting.
+- minimum 10  and maximum 20 flashcards
 
 Here is the text:
 

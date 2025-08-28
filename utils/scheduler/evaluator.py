@@ -44,8 +44,4 @@ class SchedulerEvaluator:
         elif analytics['accuracy_rate'] < 0.65:
             suggestions['exploration_weight'] = max(current_params.exploration_weight - 0.1, 0.1)
             suggestions['knowledge_weight'] = min(current_params.knowledge_weight + 0.1, 0.9)
-        if analytics['avg_response_time'] > 10.0:
-            suggestions['optimal_session_length'] = max(current_params.optimal_session_length - 5, 10)
-        elif analytics['accuracy_rate'] > 0.8 and analytics['total_reviews'] > 20:
-            suggestions['optimal_session_length'] = min(current_params.optimal_session_length + 5, 50)
         return suggestions

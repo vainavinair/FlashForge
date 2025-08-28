@@ -71,8 +71,9 @@ def init_db():
         base_forgetting_rate REAL DEFAULT 0.1,
         exploration_weight REAL DEFAULT 0.6,
         knowledge_weight REAL DEFAULT 0.4,
-        optimal_session_length INTEGER DEFAULT 20,
         last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        -- New fields for adaptive learning
+        adaptation_count INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )
     """)
@@ -97,6 +98,22 @@ def init_db():
         
         FOREIGN KEY (card_id) REFERENCES cards(card_id),
         FOREIGN KEY (user_id) REFERENCES users(user_id)
+    )
+    """)
+
+    # Scheduler state table
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS scheduler_state (
+        state_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_id INTEGER NOT NULL,
+        alpha REAL DEFAULT 1.0,
+        beta REAL DEFAULT 1.0,
+        interval_days REAL DEFAULT 0.0,
+        repetitions INTEGER DEFAULT 0,
+        next_due_at DATETIME,
+        last_result TEXT,
+        last_reviewed_at DATETIME,
+        FOREIGN KEY (card_id) REFERENCES cards(card_id)
     )
     """)
 

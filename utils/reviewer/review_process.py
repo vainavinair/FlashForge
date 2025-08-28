@@ -26,39 +26,78 @@ def _to_dt(val):
         except Exception:
             return None
 
-def get_due_cards(user_id: int, deck_id: Optional[int]=None, limit: int = 20) -> List[int]:
-    """
-    Returns a list of card_ids that are due for review.
-    If HybridScheduler is available and a deck_id is provided, prefer it.
-    Otherwise, use scheduler_state.next_due_at <= now.
-    """
-    if hybrid and deck_id:
-        # Hybrid selection provides Card objects; extract ids
-        try:
-            cards = hybrid.select_cards_for_review(deck_id, user_id, num_cards=limit)
-            return [c.card_id for c in cards]
-        except Exception as e:
-            logger.exception("Hybrid scheduler failed, falling back to simple due query: %s", e)
+def get_due_cards(user_id: int, deck_id: Optional[int] = None, limit: int = 10) -> List[int]:
+    """Get cards due for review, with fallback to simple query"""
+    # Try hybrid scheduler first
+    try:
+        if hybrid:
+            if deck_id:
+                cards = hybrid.select_cards_for_review(deck_id, user_id, limit)
+                return [card.card_id for card in cards]
+            else:
+                # For now, get cards from all user's decks
+                conn = get_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT deck_id FROM decks WHERE user_id = ?", (user_id,))
+                deck_ids = [row[0] for row in cur.fetchall()]
+                conn.close()
+                
+                all_due_cards = []
+                for d_id in deck_ids:
+                    cards = hybrid.select_cards_for_review(d_id, user_id, limit // len(deck_ids) + 1)
+                    all_due_cards.extend([card.card_id for card in cards])
+                return all_due_cards[:limit]
+    except Exception as e:
+        logger.exception("Hybrid scheduler failed, falling back to simple due query: %s", e)
 
     conn = get_connection()
     cur = conn.cursor()
     now = datetime.now().isoformat()
-    if deck_id:
-        cur.execute("""
-            SELECT s.card_id
-            FROM scheduler_state s
-            JOIN cards c ON c.card_id = s.card_id
-            WHERE c.deck_id = ? AND (s.next_due_at IS NULL OR s.next_due_at <= ?)
-            ORDER BY s.next_due_at ASC
-            LIMIT ?
-        """, (deck_id, now, limit))
+    
+    # Check if scheduler_state table exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduler_state'")
+    table_exists = cur.fetchone() is not None
+    
+    if not table_exists:
+        # If table doesn't exist, return cards that haven't been reviewed recently
+        if deck_id:
+            cur.execute("""
+                SELECT c.card_id
+                FROM cards c
+                WHERE c.deck_id = ? AND (c.last_reviewed IS NULL OR c.last_reviewed < datetime('now', '-1 day'))
+                ORDER BY c.last_reviewed ASC NULLS FIRST
+                LIMIT ?
+            """, (deck_id, limit))
+        else:
+            cur.execute("""
+                SELECT c.card_id
+                FROM cards c
+                JOIN decks d ON c.deck_id = d.deck_id
+                WHERE d.user_id = ? AND (c.last_reviewed IS NULL OR c.last_reviewed < datetime('now', '-1 day'))
+                ORDER BY c.last_reviewed ASC NULLS FIRST
+                LIMIT ?
+            """, (user_id, limit))
     else:
-        cur.execute("""
-            SELECT card_id FROM scheduler_state
-            WHERE next_due_at IS NULL OR next_due_at <= ?
-            ORDER BY next_due_at ASC
-            LIMIT ?
-        """, (now, limit))
+        # Use scheduler_state table
+        if deck_id:
+            cur.execute("""
+                SELECT s.card_id
+                FROM scheduler_state s
+                JOIN cards c ON c.card_id = s.card_id
+                WHERE c.deck_id = ? AND (s.next_due_at IS NULL OR s.next_due_at <= ?)
+                ORDER BY s.next_due_at ASC
+                LIMIT ?
+            """, (deck_id, now, limit))
+        else:
+            cur.execute("""
+                SELECT s.card_id
+                FROM scheduler_state s
+                JOIN cards c ON c.card_id = s.card_id
+                JOIN decks d ON c.deck_id = d.deck_id
+                WHERE d.user_id = ? AND (s.next_due_at IS NULL OR s.next_due_at <= ?)
+                ORDER BY s.next_due_at ASC
+                LIMIT ?
+            """, (user_id, now, limit))
 
     rows = cur.fetchall()
     conn.close()
@@ -137,6 +176,26 @@ def record_review(card_id: int, user_id: int, grade: int, response_time: Optiona
         try:
             # hybrid.update_after_review handles DB updates and logging (as in hybrid_scheduler)
             hybrid.update_after_review(card_id, user_id, success, response_time, confidence=grade)
+            
+            # Update adaptive learning parameters based on recent performance
+            try:
+                # Get recent performance data
+                conn = get_connection()
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT AVG(CAST(user_response as FLOAT)) as accuracy
+                    FROM review_history 
+                    WHERE user_id = ? AND timestamp > datetime('now', '-7 days')
+                """, (user_id,))
+                result = cur.fetchone()
+                conn.close()
+                
+                if result and result[0] is not None:
+                    performance_data = {'accuracy': result[0]}
+                    hybrid.adapt_learning_parameters(user_id, performance_data)
+            except Exception as e:
+                logger.exception("Failed to update adaptive learning parameters: %s", e)
+            
             return
         except Exception as e:
             logger.exception("Hybrid update failed, falling back: %s", e)

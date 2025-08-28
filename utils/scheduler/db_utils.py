@@ -33,9 +33,9 @@ def insert_user_params_row(user_id: int, params) -> None:
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO user_learning_params
-        (user_id, base_learning_rate, base_forgetting_rate, exploration_weight, knowledge_weight, optimal_session_length)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (user_id, params.base_learning_rate, params.base_forgetting_rate, params.exploration_weight, params.knowledge_weight, params.optimal_session_length))
+        (user_id, base_learning_rate, base_forgetting_rate, exploration_weight, knowledge_weight)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, params.base_learning_rate, params.base_forgetting_rate, params.exploration_weight, params.knowledge_weight))
     conn.commit()
     conn.close()
 

@@ -33,7 +33,6 @@ class UserLearningParams:
     base_forgetting_rate: float = 0.1
     exploration_weight: float = 0.6
     knowledge_weight: float = 0.4
-    optimal_session_length: int = 20
 
 class ThompsonSampler:
     """Handles Thompson Sampling for flashcard selection"""
@@ -116,18 +115,17 @@ class HybridScheduler:
                 base_learning_rate=row[1],
                 base_forgetting_rate=row[2],
                 exploration_weight=row[3],
-                knowledge_weight=row[4],
-                optimal_session_length=row[5]
+                knowledge_weight=row[4]
             )
         else:
             # Create default parameters for new user
             params = UserLearningParams(user_id=user_id)
             cur.execute("""
             INSERT INTO user_learning_params 
-            (user_id, base_learning_rate, base_forgetting_rate, exploration_weight, knowledge_weight, optimal_session_length)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (user_id, base_learning_rate, base_forgetting_rate, exploration_weight, knowledge_weight)
+            VALUES (?, ?, ?, ?, ?)
             """, (user_id, params.base_learning_rate, params.base_forgetting_rate, 
-                  params.exploration_weight, params.knowledge_weight, params.optimal_session_length))
+                  params.exploration_weight, params.knowledge_weight))
             conn.commit()
         
         conn.close()
@@ -355,6 +353,31 @@ class HybridScheduler:
             'mastery_rate': (knowledge_stats[1] or 0) / max(knowledge_stats[2] or 1, 1)
         }
 
+    def adapt_learning_parameters(self, user_id: int, performance_data: dict) -> None:
+        """Adapt learning parameters based on user performance data."""
+        params = self.get_user_params(user_id)
+        # Example adaptation logic
+        if performance_data['accuracy'] < 0.7:
+            params.base_learning_rate *= 0.9  # Decrease learning rate if accuracy is low
+            params.base_forgetting_rate *= 1.1  # Increase forgetting rate
+            params.exploration_weight = max(params.exploration_weight - 0.1, 0.1)
+            params.knowledge_weight = min(params.knowledge_weight + 0.1, 0.9)
+        else:
+            params.base_learning_rate *= 1.1  # Increase learning rate if accuracy is high
+            params.base_forgetting_rate *= 0.9  # Decrease forgetting rate
+            params.exploration_weight = min(params.exploration_weight + 0.1, 0.9)
+            params.knowledge_weight = max(params.knowledge_weight - 0.1, 0.1)
+        # Update the database with new parameters
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE user_learning_params
+            SET base_learning_rate = ?, base_forgetting_rate = ?, exploration_weight = ?, knowledge_weight = ?, last_updated = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+        """, (params.base_learning_rate, params.base_forgetting_rate, params.exploration_weight, params.knowledge_weight, user_id))
+        conn.commit()
+        conn.close()
+
 class SchedulerEvaluator:
     """Evaluates scheduler performance and suggests parameter adjustments"""
     
@@ -421,8 +444,12 @@ class SchedulerEvaluator:
         
         # Adjust session length
         if analytics['avg_response_time'] > 10.0:  # Slow responses indicate fatigue
-            suggestions['optimal_session_length'] = max(current_params.optimal_session_length - 5, 10)
+            # The optimal_session_length parameter is removed, so this suggestion is no longer applicable.
+            # Keeping the structure but noting the removal.
+            pass
         elif analytics['accuracy_rate'] > 0.8 and analytics['total_reviews'] > 20:
-            suggestions['optimal_session_length'] = min(current_params.optimal_session_length + 5, 50)
+            # The optimal_session_length parameter is removed, so this suggestion is no longer applicable.
+            # Keeping the structure but noting the removal.
+            pass
         
         return suggestions

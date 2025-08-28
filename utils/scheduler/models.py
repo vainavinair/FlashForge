@@ -33,7 +33,6 @@ class UserLearningParams:
     base_forgetting_rate: float = 0.1
     exploration_weight: float = 0.6
     knowledge_weight: float = 0.4
-    optimal_session_length: int = 20
     # extra fields for more advanced scheduler
     response_time_weight: float = 0.15
     auto_adapt_params: bool = True
