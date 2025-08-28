@@ -3,6 +3,7 @@ from utils.db import init_db, get_connection
 from utils.auth import register_user, login_user, logout
 from utils.deck_handler import create_deck, list_decks
 from utils.pdf_handler import load_pdf, extract_text_or_ocr
+from utils.scheduler import ensure_scheduler_row
 from utils.text_handler import load_txt, load_docx
 from utils.text_cleaner import clean_text_for_llm
 from utils.flashcard_gen import generate_flashcards
@@ -22,6 +23,7 @@ def save_flashcards(deck_id, flashcards):
             "INSERT INTO cards (deck_id, question, answer) VALUES (?, ?, ?)",
             (deck_id, card["question"], card["answer"])
         )
+        ensure_scheduler_row(card["card_id"])
     conn.commit()
     conn.close()
 
