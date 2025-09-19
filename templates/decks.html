@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Decks - FlashForge{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Your Decks</h2>
+    <!-- Button to trigger modal -->
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createDeckModal">
+        Create New Deck
+    </button>
+</div>
+
+<!-- Deck List -->
+<div class="row">
+    {% if decks %}
+        {% for deck in decks %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ deck[1] }}</h5>
+                    <a href="{{ url_for('deck_view', deck_id=deck[0]) }}" class="btn btn-secondary btn-sm">View Cards</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>You don't have any decks yet. Create one to get started!</p>
+    {% endif %}
+</div>
+
+
+<!-- Modal for creating a new deck -->
+<div class="modal fade" id="createDeckModal" tabindex="-1" aria-labelledby="createDeckModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="createDeckModalLabel">Create New Deck</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('decks') }}">
+          <div class="modal-body">
+              <div class="mb-3">
+                  <label for="deck_name" class="form-label">Deck Name</label>
+                  <input type="text" class="form-control" id="deck_name" name="deck_name" required>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Create Deck</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

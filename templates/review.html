@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Review - FlashForge{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Review / Study Mode</h2>
+
+{% if 'review_cards' in session %}
+    {# --- Review In Progress --- #}
+    {% set review_cards = session.review_cards %}
+    {% set current_idx = session.review_idx %}
+    
+    {% if current_idx < review_cards|length %}
+        {% set card_id = review_cards[current_idx] %}
+        
+        <p class="text-center text-muted">Card {{ current_idx + 1 }} of {{ review_cards|length }}</p>
+
+        <div class="flip-card mx-auto" id="flashcard">
+            <div class="flip-card-inner">
+                <div class="flip-card-front">
+                    <div>
+                        <h5 class="card-title">Question:</h5>
+                        <p class="card-text fs-4">{{ card.question }}</p>
+                    </div>
+                </div>
+                <div class="flip-card-back">
+                    <div>
+                        <h5 class="card-title">Answer:</h5>
+                        <p class="card-text fs-4">{{ card.answer }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center my-3">
+             <button class="btn btn-primary" onclick="flipCard()">Show Answer</button>
+        </div>
+        
+        <div id="review-buttons">
+            <p class="text-center mt-4">How well did you know this?</p>
+            <form method="POST" action="{{ url_for('review_process') }}" class="d-flex justify-content-around">
+                <input type="hidden" name="card_id" value="{{ card_id }}">
+                <button type="submit" name="grade" value="0" class="btn btn-danger">Failed</button>
+                <button type="submit" name="grade" value="1" class="btn btn-warning">Hard</button>
+                <button type="submit" name="grade" value="2" class="btn btn-success">Good</button>
+                <button type="submit" name="grade" value="3" class="btn btn-primary">Easy</button>
+            </form>
+        </div>
+
+        <script>
+            function flipCard() {
+                document.getElementById('flashcard').classList.toggle('is-flipped');
+            }
+        </script>
+
+    {% else %}
+        {# --- Session Complete --- #}
+        <div class="alert alert-success text-center">
+            <h4>🎉 Review session complete! Great job!</h4>
+            {% if summary %}
+                <p>You reviewed {{ summary.total_cards }} cards with an accuracy of {{ summary.accuracy }}%.</p>
+            {% endif %}
+            <a href="{{ url_for('review') }}" class="btn btn-primary mt-3">Start Another Session</a>
+        </div>
+    {% endif %}
+
+{% elif summary and summary.total_cards %}
+    {# --- Show Summary After Session Invalidation --- #}
+    <div class="alert alert-success text-center">
+        <h4>🎉 Review session complete! Great job!</h4>
+        <p>You reviewed {{ summary.total_cards }} cards with an accuracy of {{ summary.accuracy }}%.</p>
+        <a href="{{ url_for('review') }}" class="btn btn-primary mt-3">Start Another Session</a>
+    </div>
+{% else %}
+    {# --- Start a New Session --- #}
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Start a New Review Session</h5>
+            <form method="POST" action="{{ url_for('review_start') }}">
+                <div class="mb-3">
+                    <label class="form-label">Select decks to review:</label>
+                    <div class="deck-checkbox-container">
+                        {% for deck in decks %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="deck_ids" value="{{ deck[0] }}" id="deck-{{ deck[0] }}">
+                                <label class="form-check-label" for="deck-{{ deck[0] }}">
+                                    {{ deck[1] }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="limit" class="form-label">Number of cards to review:</label>
+                    <input type="number" class="form-control" id="limit" name="limit" value="10" min="1" max="50">
+                </div>
+                <button type="submit" class="btn btn-primary" {% if not decks %}disabled{% endif %}>Start Review</button>
+                 {% if not decks %}
+                    <p class="text-danger mt-2">You need to create a deck before you can start a review session.</p>
+                 {% endif %}
+            </form>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

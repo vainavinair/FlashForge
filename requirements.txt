@@ -103,3 +103,8 @@ urllib3==2.5.0
 watchdog==6.0.0
 wcwidth==0.2.13
 websockets==15.0.1
+streamlit-option-menu
+streamlit-pdf-viewer
+# Flask requirements
+Flask
+Flask-Login

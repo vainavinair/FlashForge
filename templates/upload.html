@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Upload & Generate - FlashForge{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Upload Notes to Generate Flashcards</h2>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="deck" class="form-label">Choose a deck to save into:</label>
+                <select class="form-select" id="deck" name="deck_id" required>
+                    {% if decks %}
+                        {% for deck in decks %}
+                            <option value="{{ deck[0] }}">{{ deck[1] }}</option>
+                        {% endfor %}
+                    {% else %}
+                        <option disabled>No decks available. Create one first.</option>
+                    {% endif %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="file" class="form-label">Upload PDF, TXT, or DOCX file:</label>
+                <input class="form-control" type="file" id="file" name="file" accept=".pdf,.txt,.docx" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" {% if not decks %}disabled{% endif %}>
+                Upload and Generate
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

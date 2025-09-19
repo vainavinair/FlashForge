@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ deck_name }} - FlashForge{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Cards in {{ deck_name }}</h2>
+    <a href="{{ url_for('decks') }}" class="btn btn-secondary">Back to Decks</a>
+</div>
+
+{% if cards %}
+    {% for card in cards %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Question:</strong> {{ card[0] }}
+        </div>
+        <div class="card-body">
+            <strong>Answer:</strong> {{ card[1] }}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <p>This deck has no cards yet.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Home - FlashForge{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="px-4 py-5 my-5 text-center">
+    <img class="d-block mx-auto mb-4" src="https://img.icons8.com/plasticine/100/brain.png" alt="Brain icon" width="72">
+    <h1 class="display-5 fw-bold">Welcome to FlashForge</h1>
+    <div class="col-lg-6 mx-auto">
+        <p class="lead mb-4">The intelligent way to learn. Transform your notes into interactive flashcards, master topics with our AI-powered spaced repetition system, and watch your knowledge grow.</p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 gap-3">Go to Dashboard</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 gap-3">Get Started for Free</a>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">Login</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="container px-4 py-5" id="featured-3">
+    <h2 class="pb-2 border-bottom text-center">How It Works</h2>
+    <div class="row g-4 py-5 row-cols-1 row-cols-lg-3">
+      <div class="feature col text-center">
+        <div class="feature-icon-small d-inline-flex align-items-center justify-content-center text-bg-primary bg-gradient fs-4 rounded-3 mb-3">
+            <img src="https://img.icons8.com/fluency/48/upload-to-cloud.png" alt="Upload icon" width="40" height="40">
+        </div>
+        <h3 class="fs-2">1. Upload & Generate</h3>
+        <p>Easily upload your notes in PDF, TXT, or DOCX format. Our AI will automatically parse the content and generate a complete set of flashcards for you in seconds.</p>
+      </div>
+      <div class="feature col text-center">
+        <div class="feature-icon-small d-inline-flex align-items-center justify-content-center text-bg-primary bg-gradient fs-4 rounded-3 mb-3">
+           <img src="https://img.icons8.com/fluency/48/synchronize.png" alt="Review icon" width="40" height="40">
+        </div>
+        <h3 class="fs-2">2. Smart Review</h3>
+        <p>Study your flashcards with our intelligent spaced repetition system. It tracks your performance and schedules reviews at the optimal time to move information to long-term memory.</p>
+      </div>
+      <div class="feature col text-center">
+        <div class="feature-icon-small d-inline-flex align-items-center justify-content-center text-bg-primary bg-gradient fs-4 rounded-3 mb-3">
+          <img src="https://img.icons8.com/fluency/48/combo-chart.png" alt="Track icon" width="40" height="40">
+        </div>
+        <h3 class="fs-2">3. Track Progress</h3>
+        <p>Monitor your learning with a detailed dashboard. See your activity, track your knowledge state for each deck, and get ML-powered insights to optimize your study habits.</p>
+      </div>
+    </div>
+</div>
+{% endblock %}

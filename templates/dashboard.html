@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FlashForge{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+<!-- Metrics -->
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Total Decks</h5>
+                <p class="card-text fs-4">{{ data.stats.total_decks }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Total Cards</h5>
+                <p class="card-text fs-4">{{ data.stats.total_cards }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Avg Knowledge</h5>
+                <p class="card-text fs-4">{{ "%.1f"|format(data.stats.avg_knowledge * 100 if data.stats.avg_knowledge else 0) }}%</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Mastered Cards (≥0.7)</h5>
+                <p class="card-text fs-4">{{ data.stats.mastered_cards }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Reviews (7d)</h5>
+                <p class="card-text fs-4">{{ data.stats.reviews_last_7_days }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title">Accuracy (30d)</h5>
+                {% if data.ml_analytics and data.ml_analytics.accuracy_rate is not none %}
+                <p class="card-text fs-4">{{ "%.1f"|format(data.ml_analytics.accuracy_rate * 100) }}%</p>
+                {% else %}
+                <p class="card-text fs-4">—</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mt-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Activity — Last 30 Days</h5>
+                <canvas id="reviewsChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Deck Health</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Deck</th>
+                                <th class="text-end">Cards</th>
+                                <th class="text-end">Due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for index, row in data.deck_df.iterrows() %}
+                            <tr>
+                                <td>{{ row.deck_name }}</td>
+                                <td class="text-end">{{ row.cards }}</td>
+                                <td class="text-end">{{ row.due_today }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center">No decks yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tables -->
+<div class="row mt-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Recent Reviews</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Question</th>
+                                <th>Result</th>
+                                <th class="text-end">Time Taken</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                             {% for index, row in data.recent_df.iterrows() %}
+                            <tr>
+                                <td>{{ row.time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ row.question[:50] }}{{ '...' if row.question|length > 50 else '' }}</td>
+                                <td class="{{ 'text-success' if row.result == 'Correct' else 'text-danger' }}">{{ row.result }}</td>
+                                <td class="text-end">{{ "%.1f"|format(row.resp_time) }}s</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center">No recent reviews.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">ML Insights</h5>
+                {% if data.ml_analytics %}
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Accuracy (30d)
+                            <span class="badge bg-primary rounded-pill">{{ "%.1f"|format(data.ml_analytics.accuracy_rate * 100 if data.ml_analytics.accuracy_rate else 0) }}%</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Avg Response Time
+                            <span class="badge bg-primary rounded-pill">{{ "%.1f"|format(data.ml_analytics.avg_response_time | default(0)) }}s</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Mastery Rate
+                             <span class="badge bg-primary rounded-pill">{{ "%.1f"|format(data.ml_analytics.mastery_rate * 100 if data.ml_analytics.mastery_rate else 0) }}%</span>
+                        </li>
+                    </ul>
+                {% else %}
+                    <p class="text-center">ML analytics will appear after you have some reviews.</p>
+                {% endif %}
+                
+                {% if data.ml_suggestions %}
+                <h6 class="mt-3">Parameter Suggestions</h6>
+                <ul class="list-group list-group-flush">
+                    {% for key, value in data.ml_suggestions.items() %}
+                        <li class="list-group-item">{{ key.replace('_', ' ')|title }}: <strong>{{ value }}</strong></li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    fetch("{{ url_for('chart_data') }}")
+        .then(response => response.json())
+        .then(data => {
+            if (data.labels && data.labels.length > 0) {
+                const reviewsCtx = document.getElementById('reviewsChart').getContext('2d');
+                new Chart(reviewsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Reviews per day',
+                            data: data.reviews,
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    }
+                });
+            }
+        });
+});
+</script>
+{% endblock %}
