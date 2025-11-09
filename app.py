@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 
 # Your existing utils will be used here
 from utils.auth.auth import register_user as auth_register_user, login_user as auth_login_user
@@ -445,4 +445,5 @@ def chart_data():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

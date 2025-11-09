@@ -7,7 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TESS_PATH = os.getenv("TESS_PATH")
-pytesseract.pytesseract.tesseract_cmd = TESS_PATH
+# Only set tesseract_cmd if TESS_PATH is provided, otherwise use system default
+if TESS_PATH:
+    pytesseract.pytesseract.tesseract_cmd = TESS_PATH
 
 def ocr_image(image: Image.Image) -> str:
     """

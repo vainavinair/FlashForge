@@ -2,10 +2,14 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join("database", "flashforge.db")
+# Use environment variable for database path, fallback to local development path
+DB_PATH = os.getenv('DATABASE_PATH', os.path.join("database", "flashforge.db"))
 
 def get_connection():
-    os.makedirs("database", exist_ok=True)
+    # Ensure directory exists for database file
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:  # Only create directory if path has a directory component
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     return conn
 

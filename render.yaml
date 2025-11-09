@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: flashforge
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/flashforge.db
+      - key: TESS_PATH
+        value: /usr/bin/tesseract
+      - key: PYTHON_VERSION
+        value: 3.12.0
+    disk:
+      name: flashforge-data
+      mountPath: /var/data
+      sizeGB: 1
+    healthCheckPath: /
+    plan: free
+
