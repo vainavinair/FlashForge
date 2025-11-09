@@ -1,12 +1,19 @@
-import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=api_key)
+# Lazy loading - only import when actually generating flashcards
+_model = None
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+def _get_model():
+    """Lazy load the Gemini model to avoid slow imports on app startup."""
+    global _model
+    if _model is None:
+        import google.generativeai as genai
+        load_dotenv()
+        api_key = os.getenv("GEMINI_API_KEY")
+        genai.configure(api_key=api_key)
+        _model = genai.GenerativeModel('gemini-1.5-flash')
+    return _model
 
 def generate_flashcards(text: str) -> list[dict]:
     """
@@ -40,6 +47,7 @@ Generate only the flashcards now.
 """
 
     try:
+        model = _get_model()
         response = model.generate_content(prompt)
         raw_flashcards = response.text.strip().split("\n")
         

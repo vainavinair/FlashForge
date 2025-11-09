@@ -117,6 +117,54 @@ def init_db():
     )
     """)
 
+    # Evaluation results table for research metrics
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS evaluation_results (
+        evaluation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deck_id INTEGER,
+        user_id INTEGER,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        
+        -- Source text metadata
+        source_text_length INTEGER,
+        num_flashcards INTEGER,
+        
+        -- BERTScore metrics
+        bert_precision REAL,
+        bert_recall REAL,
+        bert_f1 REAL,
+        question_f1 REAL,
+        answer_f1 REAL,
+        
+        -- Keyword coverage metrics
+        keyword_coverage_score REAL,
+        total_keywords INTEGER,
+        covered_keywords INTEGER,
+        
+        -- Full evaluation data as JSON
+        evaluation_data TEXT,
+        
+        FOREIGN KEY (deck_id) REFERENCES decks(deck_id),
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+    )
+    """)
+
+    # Source texts table to store original texts for evaluation
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS source_texts (
+        source_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deck_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        filename TEXT,
+        content TEXT NOT NULL,
+        content_hash TEXT,
+        upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        
+        FOREIGN KEY (deck_id) REFERENCES decks(deck_id),
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+    )
+    """)
+
     # Create indexes for better performance
     cur.execute("CREATE INDEX IF NOT EXISTS idx_cards_deck_id ON cards(deck_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_cards_last_reviewed ON cards(last_reviewed)")
@@ -124,6 +172,10 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_review_history_card_id ON review_history(card_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_review_history_user_id ON review_history(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_review_history_timestamp ON review_history(timestamp)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaluation_results_deck_id ON evaluation_results(deck_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaluation_results_user_id ON evaluation_results(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evaluation_results_timestamp ON evaluation_results(timestamp)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_source_texts_deck_id ON source_texts(deck_id)")
 
     conn.commit()
     conn.close()

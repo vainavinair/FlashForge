@@ -207,3 +207,10 @@ marimo/_lsp/
 __marimo__/
 
 database/
+
+#ignore all pdfs
+*.pdf
+
+#ignore all csv and json file
+*.csv
+*.json
