@@ -292,28 +292,38 @@ class BatchEvaluator:
         """Calculate quality distribution across different thresholds."""
         if not bert_scores or not coverage_scores:
             return {}
-        
-        # Combined quality score
+
+        # For flashcards, absolute BERTScore values tend to be lower than
+        # for tasks like translation or summarization, because Q/A pairs
+        # are short and compare against longer reference snippets.
+        # Use thresholds calibrated for this use case:
+        #
+        #   ≥ 0.70  → excellent alignment
+        #   0.50–0.70 → good, clearly on‑topic
+        #   0.35–0.50 → fair, partially aligned
+        #   < 0.35  → poor
+
+        # Combined quality score (simple average of bert + coverage)
         combined_scores = [(b + c) / 2 for b, c in zip(bert_scores, coverage_scores)]
-        
+
         return {
             'bert_f1_distribution': {
-                'excellent_ge_0.8': sum(1 for s in bert_scores if s >= 0.8),
-                'good_0.6_to_0.8': sum(1 for s in bert_scores if 0.6 <= s < 0.8),
-                'fair_0.4_to_0.6': sum(1 for s in bert_scores if 0.4 <= s < 0.6),
-                'poor_lt_0.4': sum(1 for s in bert_scores if s < 0.4)
+                'excellent_ge_0.7': sum(1 for s in bert_scores if s >= 0.7),
+                'good_0.5_to_0.7': sum(1 for s in bert_scores if 0.5 <= s < 0.7),
+                'fair_0.35_to_0.5': sum(1 for s in bert_scores if 0.35 <= s < 0.5),
+                'poor_lt_0.35': sum(1 for s in bert_scores if s < 0.35)
             },
             'coverage_distribution': {
-                'excellent_ge_0.7': sum(1 for s in coverage_scores if s >= 0.7),
-                'good_0.5_to_0.7': sum(1 for s in coverage_scores if 0.5 <= s < 0.7),
-                'fair_0.3_to_0.5': sum(1 for s in coverage_scores if 0.3 <= s < 0.5),
-                'poor_lt_0.3': sum(1 for s in coverage_scores if s < 0.3)
+                'excellent_ge_0.8': sum(1 for s in coverage_scores if s >= 0.8),
+                'good_0.6_to_0.8': sum(1 for s in coverage_scores if 0.6 <= s < 0.8),
+                'fair_0.4_to_0.6': sum(1 for s in coverage_scores if 0.4 <= s < 0.6),
+                'poor_lt_0.4': sum(1 for s in coverage_scores if s < 0.4)
             },
             'combined_quality': {
-                'high_ge_0.75': sum(1 for s in combined_scores if s >= 0.75),
-                'medium_0.55_to_0.75': sum(1 for s in combined_scores if 0.55 <= s < 0.75),
-                'low_0.35_to_0.55': sum(1 for s in combined_scores if 0.35 <= s < 0.55),
-                'very_low_lt_0.35': sum(1 for s in combined_scores if s < 0.35)
+                'high_ge_0.65': sum(1 for s in combined_scores if s >= 0.65),
+                'medium_0.45_to_0.65': sum(1 for s in combined_scores if 0.45 <= s < 0.65),
+                'low_0.30_to_0.45': sum(1 for s in combined_scores if 0.30 <= s < 0.45),
+                'very_low_lt_0.30': sum(1 for s in combined_scores if s < 0.30)
             }
         }
     

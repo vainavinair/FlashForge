@@ -190,11 +190,25 @@ document.addEventListener('DOMContentLoaded', function () {
                         datasets: [{
                             label: 'Reviews per day',
                             data: data.reviews,
-                            borderColor: 'rgba(52, 152, 219, 1)',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderColor: 'rgba(99, 102, 241, 1)',
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
                             fill: true,
                             tension: 0.4
                         }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }
+                        }
                     }
                 });
             }

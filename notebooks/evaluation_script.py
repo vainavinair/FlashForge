@@ -39,7 +39,7 @@ genai.configure(api_key=api_key)
 def generate_flashcards_from_text(text: str):
     """Generates flashcards from text using the Gemini API."""
     
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')
     
     prompt = f"""
     Based on the text below, generate a list of 5-10 flashcards.

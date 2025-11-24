@@ -101,10 +101,11 @@ def batch_evaluate_documents(input_dir: str, output_dir: str = "evaluation_resul
             print(f"\n📈 Quality Distribution:")
             if 'bert_f1_distribution' in quality:
                 bert_dist = quality['bert_f1_distribution']
-                print(f"   BERTScore F1 - Excellent (≥0.8): {bert_dist['excellent_ge_0.8']}")
-                print(f"                 Good (0.6-0.8): {bert_dist['good_0.6_to_0.8']}")
-                print(f"                 Fair (0.4-0.6): {bert_dist['fair_0.4_to_0.6']}")
-                print(f"                 Poor (<0.4): {bert_dist['poor_lt_0.4']}")
+                # Thresholds are calibrated for flashcards (short Q/A vs snippets)
+                print(f"   BERTScore F1 - Excellent (≥0.7): {bert_dist['excellent_ge_0.7']}")
+                print(f"                 Good (0.5-0.7): {bert_dist['good_0.5_to_0.7']}")
+                print(f"                 Fair (0.35-0.5): {bert_dist['fair_0.35_to_0.5']}")
+                print(f"                 Poor (<0.35): {bert_dist['poor_lt_0.35']}")
     
     print(f"\n💾 Results saved to: {output_dir}")
     print("   - batch_evaluation_report_*.json (complete results)")

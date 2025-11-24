@@ -36,7 +36,77 @@ class FlashcardEvaluator:
     
     def __init__(self):
         self.bert_model = 'bert-base-uncased'  # Default BERT model for scoring
-        
+
+    def _build_reference_snippets(
+        self,
+        source_text: str,
+        generated_flashcards: List[Dict[str, str]],
+        max_snippet_chars: int = 400,
+    ) -> List[str]:
+        """
+        Build shorter reference snippets for each flashcard instead of
+        comparing against the full document.
+
+        Heuristic:
+        - Split the source text into sentences.
+        - For each flashcard, choose the sentence with the highest token overlap
+          with (question + answer).
+        - If nothing matches, fall back to a leading chunk of the document.
+        """
+        # Simple sentence split
+        sentences = re.split(r"(?<=[.!?])\s+", source_text)
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
+
+        # Stop words to ignore when computing overlap
+        stop_words = {
+            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
+            'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his',
+            'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'boy',
+            'did', 'she', 'use', 'way', 'many', 'then', 'them', 'these', 'some',
+            'time', 'very', 'when', 'come', 'here', 'just', 'like', 'long', 'make',
+            'over', 'such', 'take', 'than', 'they', 'well', 'were', 'will', 'with',
+            'have', 'this', 'that', 'from', 'been', 'each', 'which', 'their', 'said',
+            'would', 'there', 'what', 'could', 'other', 'after', 'first', 'never',
+            'think', 'where', 'being', 'every', 'great', 'might', 'shall', 'still',
+            'those', 'while', 'should', 'through', 'before', 'between', 'both', 'few',
+            'more', 'most', 'some', 'such'
+        }
+
+        def tokenize(text: str) -> set[str]:
+            tokens = re.findall(r"\b[A-Za-z]+\b", text.lower())
+            return {t for t in tokens if len(t) > 2 and t not in stop_words}
+
+        sentence_tokens = [tokenize(s) for s in sentences]
+
+        references: List[str] = []
+        fallback = source_text[:max_snippet_chars]
+
+        for card in generated_flashcards:
+            qa_text = f"{card.get('question', '')} {card.get('answer', '')}"
+            qa_tokens = tokenize(qa_text)
+            if not qa_tokens or not sentences:
+                references.append(fallback)
+                continue
+
+            best_idx = 0
+            best_overlap = 0
+            for idx, stoks in enumerate(sentence_tokens):
+                overlap = len(qa_tokens & stoks)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_idx = idx
+
+            if best_overlap == 0:
+                references.append(fallback)
+            else:
+                # Optionally trim very long sentences
+                snippet = sentences[best_idx]
+                if len(snippet) > max_snippet_chars:
+                    snippet = snippet[:max_snippet_chars]
+                references.append(snippet)
+
+        return references
+
     def evaluate_bert_score(self, source_text: str, generated_flashcards: List[Dict[str, str]]) -> Optional[Dict[str, float]]:
         """
         Calculate BERTScore for generated flashcards against the source text.
@@ -53,17 +123,37 @@ class FlashcardEvaluator:
             return None
 
         try:
-            questions = [card['question'] for card in generated_flashcards]
-            answers = [card['answer'] for card in generated_flashcards]
-            
-            # Create reference texts for comparison
-            source_texts = [source_text] * len(questions)
-            
+            questions = [card["question"] for card in generated_flashcards]
+            answers = [card["answer"] for card in generated_flashcards]
+
+            # Build shorter, per-card reference snippets instead of full document
+            reference_texts = self._build_reference_snippets(source_text, generated_flashcards)
+
+            # Use a lighter model + small batch size to avoid OOM issues on Windows
+            device = os.getenv("BERTSCORE_DEVICE", "cpu")
+            batch_size = int(os.getenv("BERTSCORE_BATCH_SIZE", "8"))
+
             # Score questions against source
-            P_q, R_q, F1_q = bert_scorer(questions, source_texts, lang='en', verbose=False)
-            
+            P_q, R_q, F1_q = bert_scorer(
+                questions,
+                reference_texts,
+                model_type=self.bert_model,
+                batch_size=batch_size,
+                device=device,
+                verbose=False,
+                rescale_with_baseline=False,
+            )
+
             # Score answers against source
-            P_a, R_a, F1_a = bert_scorer(answers, source_texts, lang='en', verbose=False)
+            P_a, R_a, F1_a = bert_scorer(
+                answers,
+                reference_texts,
+                model_type=self.bert_model,
+                batch_size=batch_size,
+                device=device,
+                verbose=False,
+                rescale_with_baseline=False,
+            )
             
             # Calculate average scores
             avg_precision = (P_q.mean() + P_a.mean()) / 2
@@ -100,8 +190,7 @@ class FlashcardEvaluator:
         try:
             # Extract keywords using improved regex-based approach
             words = re.findall(r'\b[A-Za-z]+\b', source_text)
-            
-            source_keywords = set()
+
             stop_words = {
                 'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 
                 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 
@@ -111,17 +200,28 @@ class FlashcardEvaluator:
                 'over', 'such', 'take', 'than', 'they', 'well', 'were', 'will', 'with',
                 'have', 'this', 'that', 'from', 'been', 'each', 'which', 'their', 'said',
                 'would', 'there', 'what', 'could', 'other', 'after', 'first', 'never',
-                'these', 'think', 'where', 'being', 'every', 'great', 'might', 'shall',
-                'still', 'those', 'while', 'should', 'never', 'through', 'before', 'here',
-                'between', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such'
+                'think', 'where', 'being', 'every', 'great', 'might', 'shall',
+                'still', 'those', 'while', 'should', 'through', 'before', 'here',
+                'between', 'both', 'each', 'few', 'more', 'most', 'some', 'such'
             }
-            
+
+            # Build a frequency map of candidate keywords
+            freq = {}
             for word in words:
                 word_lower = word.lower()
                 # Include capitalized words (proper nouns) or longer content words
                 if (word[0].isupper() or len(word) > 4) and len(word) > 2:
                     if word_lower not in stop_words:
-                        source_keywords.add(word_lower)
+                        freq[word_lower] = freq.get(word_lower, 0) + 1
+
+            if not freq:
+                logger.warning("No keywords found in source text for coverage analysis")
+                return {'coverage_score': 0.0, 'total_keywords': 0, 'covered_keywords': 0, 'keywords': []}
+
+            # Focus on the top-N most frequent keywords to get a more meaningful coverage signal
+            top_n = int(os.getenv("KEYWORD_COVERAGE_TOP_N", "40"))
+            sorted_keywords = sorted(freq.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
+            source_keywords = {w for w, _ in sorted_keywords}
             
             if not source_keywords:
                 logger.warning("No keywords found in source text for coverage analysis")

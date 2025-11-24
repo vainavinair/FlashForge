@@ -12,7 +12,7 @@ def _get_model():
         load_dotenv()
         api_key = os.getenv("GEMINI_API_KEY")
         genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel('gemini-1.5-flash')
+        _model = genai.GenerativeModel('gemini-2.0-flash')
     return _model
 
 def generate_flashcards(text: str) -> list[dict]:
@@ -23,28 +23,48 @@ def generate_flashcards(text: str) -> list[dict]:
         List of dicts: [{"question": str, "answer": str}, ...]
     """
     prompt = f"""
-You are an expert at creating flashcards for active recall learning.  
-I will give you text from a textbook or study notes.  
-Create flashcards in the exact format:
+You are an expert at creating high‑quality flashcards based on cognitive
+science and active‑recall learning principles.
 
-Q: [clear, concise question]  
-A: [short answer, max 8 words]  
+I will give you text from a textbook or study notes.
+Follow this process:
 
-Rules:
-- Answers must be short enough to fit on one side of a flashcard.
-- Avoid full sentences unless necessary — prefer key terms or short phrases.
-- Each card should test only one fact or concept.
-- Skip unclear or irrelevant parts of the text.
-- Do not include explanations, examples, or commentary.
-- Output only the flashcards, one per line, no extra formatting.
-- minimum 10  and maximum 20 flashcards
+1. Break the text into clear meaning units without losing essential ideas,
+   abbreviations, or acronyms.
+2. From these meaning units, generate flashcards that each test one atomic
+   concept.
+3. Write questions that promote active recall, including a mix of factual
+   and conceptual questions. Do not generate recognition‑style questions
+   (no \"Which of the following\" or simple true/false).
+
+Produce flashcards in the **exact** format (no bullets, numbering, or extra text):
+
+Q: [concise, unambiguous question]
+A: [short answer, ideally 5‑12 words]
+
+Important content rules (optimize for semantic coverage of the source):
+- Reuse key technical terms and important phrases from the original text
+  whenever they are clear. Prefer preserving terminology rather than
+  paraphrasing it away.
+- Each flashcard must cover exactly one important fact, relationship,
+  definition, formula, or acronym expansion.
+- Answers should usually contain the main term or phrase that appears in
+  the source text, so that the meaning is very close to the original.
+- Let the number of flashcards be appropriate to the content; for a
+  typical 2–5 page document, generate **12–25** high‑quality cards.
+- Prefer high‑quality, concept‑dense flashcards over quantity.
+- Answers must still be short enough to fit on one side of a flashcard.
+- Avoid long explanations, examples, or commentary in either question or answer.
+- Skip irrelevant or unclear parts of the text.
+- Output only flashcards, one Q/A pair after another, one card per line or
+  per two lines, with no extra prose before or after.
 
 Here is the text:
 
 {text}
-
-Generate only the flashcards now.
 """
+
+    
 
     try:
         model = _get_model()

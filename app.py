@@ -135,7 +135,8 @@ def load_dashboard_data(user_id: int):
 
     # Convert timestamp strings to datetime objects
     if not recent_df.empty:
-        recent_df['time'] = pd.to_datetime(recent_df['time'])
+        recent_df['time'] = pd.to_datetime(recent_df['time'], format='mixed')
+
 
     conn.close()
 
